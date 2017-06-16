@@ -29,6 +29,7 @@ class WifiHandler
         void update_ap_config();
         static const int CONNECTED_BIT = BIT0;
         static const int INITIALISE_BIT = BIT1;
+        static const int AP_CONNECTED_BIT = BIT2;
     private:
         static WifiHandler *instance;
         WifiHandler();

@@ -155,16 +155,17 @@ esp_err_t WifiHandler::event_handler(void *ctx, system_event_t *event)
         esp_wifi_connect();
         break;
     case SYSTEM_EVENT_STA_GOT_IP:
-        xEventGroupClearBits(WifiHandler::wifi_event_group, CONNECTED_BIT);
+        xEventGroupSetBits(WifiHandler::wifi_event_group, CONNECTED_BIT);
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
         /* This is a workaround as ESP32 WiFi libs don't currently
            auto-reassociate. */
         //esp_wifi_connect();
-        xEventGroupSetBits(WifiHandler::wifi_event_group, CONNECTED_BIT);
+        xEventGroupClearBits(WifiHandler::wifi_event_group, CONNECTED_BIT);
         break;
     case SYSTEM_EVENT_AP_STACONNECTED:
         printf("station connected to access point. Now listing connected stations!\n");
+        xEventGroupSetBits(WifiHandler::wifi_event_group, AP_CONNECTED_BIT);
         wifi_sta_list_t sta_list;
         ESP_ERROR_CHECK( esp_wifi_ap_get_sta_list(&sta_list));
         for(int i = 0; i < sta_list.num; i++)
@@ -189,7 +190,7 @@ void WifiHandler::reconnect_thread(void *PvParameters)
     {
         EventBits_t bits = xEventGroupWaitBits(handler->wifi_event_group, BIT0, pdFALSE,pdTRUE, portMAX_DELAY);
 
-        if ((bits & BIT0)) 
+        if ((bits & BIT0))
         {   //Try to reconnect in 15 seconds after disconnect
             vTaskDelay(15000 / portTICK_PERIOD_MS);
             esp_wifi_connect();
