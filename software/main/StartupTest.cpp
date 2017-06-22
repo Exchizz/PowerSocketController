@@ -1,38 +1,47 @@
 extern "C"
 {
-    #include "spiffs.h"
     #include <dirent.h>
     #include <sys/stat.h>
+    #include <cstring>
 }
 
 #include "FilesystemHandler.h"
 
+void listdir(const char *name, int level)
+{
+    DIR *dir;
+    struct dirent *entry;
+
+    if (!(dir = opendir(name)))
+        return;
+    if (!(entry = readdir(dir)))
+        return;
+
+    do {
+        if (entry->d_type == DT_DIR) {
+            char path[1024];
+            int len = snprintf(path, sizeof(path)-1, "%s/%s", name, entry->d_name);
+            path[len] = 0;
+            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+                continue;
+            printf("%*s[%s]\n", level*2, "", entry->d_name);
+            listdir(path, level + 1);
+        }
+        else
+            printf("%*s- %s\n", level*2, "", entry->d_name);
+    } while ( (entry = readdir(dir)) );
+    closedir(dir);
+}
+
 bool do_startup_test()
 {
-    FilesystemHandler *fs_handler = FilesystemHandler::get_instance();
     #define CHUNK 150
     char buf[CHUNK];
-    int nread;
 
-    //Read using spiffs api
-    printf("Trying to read using SPIFFS API!\n");
-    spiffs_file f = SPIFFS_open(&fs_handler->fs, "/html/README.md", SPIFFS_O_RDONLY, 0);
-
-    printf("%d\n", (size_t)f);
-    if (f) {
-        while ((nread = SPIFFS_read(&fs_handler->fs, f, buf, sizeof buf)) > 0)
-        {
-            printf("%.*s", nread, buf);
-        }
-        printf("%d\n", nread);
-        SPIFFS_close(&fs_handler->fs, f);
-        printf("\n");
-    }
     printf("Now trying to read using VFS API!\n");
 
     FILE *file;
-    file = fopen("/spiffs/html/README.md", "rw");
-    printf("%d\n", (size_t)f);
+    file = fopen("/data/html/README.md", "rw");
     if (file) {
         while (fgets(buf, 50, file) != nullptr)
         {
@@ -41,33 +50,10 @@ bool do_startup_test()
         fclose(file);
         printf("\n");
     }
-    else return false;
-    printf("Now trying to list the files in the spiffs partition!\n");
-    printf("We first try using SPIFFS calls directly.\n");
-
-    spiffs_DIR dir;
-	struct spiffs_dirent dirEnt;
-	const char rootPath[] = "/html/";
-
-
-	if (SPIFFS_opendir(&fs_handler->fs, rootPath, &dir) == NULL) {
-		printf("Unable to open %s dir", rootPath);
-		return false;
-	}
-	while(SPIFFS_readdir(&dir, &dirEnt) != NULL) {
-		int len = strlen((char *)dirEnt.name);
-		// Skip files that end with "/."
-		if (len>=2 && strcmp((char *)(dirEnt.name + len -2), "/.") == 0) {
-			continue;
-		}
-        printf("%s\n", dirEnt.name);
-    }
-    SPIFFS_closedir(&dir);
-
     printf("We now try through the filesystem.\n");
     DIR *midir;
     struct dirent* info_archivo;
-    if ((midir = opendir("/spiffs/html/")) == NULL)
+    if ((midir = opendir("/data/html/")) == NULL)
     {
         perror("Error in opendir\n");
     }
@@ -75,17 +61,18 @@ bool do_startup_test()
     {
         while ((info_archivo = readdir(midir)) != 0)
             printf ("%s \n", info_archivo->d_name);
+        closedir(midir);
+
     }
-    closedir(midir);
 
     printf("We see if stat is working by accessing a file which we know is there.\n");
     struct stat stat_buf;
-    printf("Stat result:%d\n",stat("/spiffs/html/README.md", &stat_buf));
+    printf("Stat result:%d\n",stat("/data/html/README.md", &stat_buf));
 
-    printf("Stat result:%d\n",stat("/spiffs/html/.", &stat_buf));
-    printf("Stat result:%d\n",stat("/spiffs/ht/.", &stat_buf));
-    printf("Stat result:%d\n",stat("/spiffs/html", &stat_buf));
-    printf("Stat result:%d\n",stat("/spiffs/html/", &stat_buf));
-
+    printf("Stat result:%d\n",stat("/data/html/.", &stat_buf));
+    printf("Stat result:%d\n",stat("/data/ht/.", &stat_buf));
+    printf("Stat result:%d\n",stat("/data/html", &stat_buf));
+    printf("Stat result:%d\n",stat("/data/html/", &stat_buf));
+    listdir("/data/", 10);
     return true;
 }
